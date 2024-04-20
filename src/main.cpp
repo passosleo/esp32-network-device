@@ -11,18 +11,25 @@ WebServer server(80);
 String ssid = "";
 String password = "";
 
-#define AP_MODE_INDICATOR_PIN 2
-#define CLIENT_MODE_INDICATOR_PIN 4
+#define AP_MODE_LED_PIN 2
+#define CLIENT_MODE_LED_PIN 4
 #define RESET_PIN 5
 
-// Definir o endereço de memória EEPROM onde as credenciais serão armazenadas
 #define EEPROM_SIZE 512
 #define EEPROM_ADDR_MAGIC 0
 #define EEPROM_MAGIC_VALUE 0xA5
 
+void blinkLED(int pin, int delayTime = 1000)
+{
+  digitalWrite(pin, LOW);
+  delay(delayTime);
+  digitalWrite(pin, HIGH);
+  delay(delayTime);
+}
+
 void handleRoot()
 {
-  server.send(200, "text/html", "<h1>Configuração de Rede WiFi</h1><form action='/configure-wifi' method='post'>SSID: <input type='text' name='ssid'><br>Senha: <input type='password' name='password'><br><input type='submit' value='Enviar'></form>");
+  server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><h1>Configuração de Rede Wi-Fi</h1><form action='/configure-wifi' method='post'><label for='ssid'>SSID:</label><input type='text' id='ssid' name='ssid'><br><br><label for='password'>Senha:</label><input type='password' id='password' name='password'><br><br><input type='submit' value='Enviar'></form></body></html>");
 }
 
 void handleConfigureWiFi()
@@ -31,14 +38,14 @@ void handleConfigureWiFi()
   {
     ssid = server.arg("ssid");
     password = server.arg("password");
-    // Salvar as credenciais na EEPROM
+
     EEPROM.begin(EEPROM_SIZE);
     EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC_VALUE);
     EEPROM.put(EEPROM_ADDR_MAGIC + 1, ssid);
     EEPROM.put(EEPROM_ADDR_MAGIC + 1 + sizeof(ssid), password);
     EEPROM.commit();
     EEPROM.end();
-    server.send(200, "text/plain", "Configuração bem-sucedida! Reiniciando o ESP32...");
+    server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><p>Configuração salva com sucesso!</p></body></html>");
     delay(2000);
     ESP.restart();
   }
@@ -56,31 +63,32 @@ bool hasStoredWiFiCredentials()
   return hasCredentials;
 }
 
-bool isConnected()
+bool isWiFiConnected()
 {
   return WiFi.status() == WL_CONNECTED;
 }
 
 void setupWiFiClientMode()
 {
-  digitalWrite(AP_MODE_INDICATOR_PIN, LOW);
+  digitalWrite(AP_MODE_LED_PIN, LOW);
   WiFi.begin(ssid.c_str(), password.c_str());
-  while (!isConnected())
+
+  while (!isWiFiConnected())
   {
-    digitalWrite(CLIENT_MODE_INDICATOR_PIN, LOW);
-    delay(1000);
-    digitalWrite(CLIENT_MODE_INDICATOR_PIN, HIGH);
-    delay(1000);
+    blinkLED(CLIENT_MODE_LED_PIN);
     Serial.println("Tentando se conectar à rede WiFi...");
   }
+
   Serial.println("Conectado à rede WiFi");
-  digitalWrite(CLIENT_MODE_INDICATOR_PIN, HIGH);
+  Serial.print("Endereço IP: ");
+  Serial.println(WiFi.localIP());
+  digitalWrite(CLIENT_MODE_LED_PIN, HIGH);
 }
 
 void setupWiFiAPMode()
 {
   isInAPMode = true;
-  digitalWrite(CLIENT_MODE_INDICATOR_PIN, LOW);
+  digitalWrite(CLIENT_MODE_LED_PIN, LOW);
   WiFi.mode(WIFI_MODE_AP);
   WiFi.softAP(apSSID, apPassword);
 }
@@ -104,21 +112,25 @@ void resetWiFiCredentials()
   ESP.restart();
 }
 
+void getStoredWiFiCredentials()
+{
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.get(EEPROM_ADDR_MAGIC + 1, ssid);
+  EEPROM.get(EEPROM_ADDR_MAGIC + 1 + sizeof(ssid), password);
+  EEPROM.end();
+}
+
 void setup()
 {
-  pinMode(AP_MODE_INDICATOR_PIN, OUTPUT);
-  pinMode(CLIENT_MODE_INDICATOR_PIN, OUTPUT);
+  pinMode(AP_MODE_LED_PIN, OUTPUT);
+  pinMode(CLIENT_MODE_LED_PIN, OUTPUT);
   pinMode(RESET_PIN, INPUT_PULLUP);
   Serial.begin(115200);
   delay(1000);
 
   if (hasStoredWiFiCredentials())
   {
-    EEPROM.begin(EEPROM_SIZE);
-    EEPROM.get(EEPROM_ADDR_MAGIC + 1, ssid);
-    EEPROM.get(EEPROM_ADDR_MAGIC + 1 + sizeof(ssid), password);
-    EEPROM.end();
-
+    getStoredWiFiCredentials();
     setupWiFiClientMode();
   }
   else
@@ -134,19 +146,10 @@ void loop()
 
   if (isInAPMode)
   {
-    digitalWrite(AP_MODE_INDICATOR_PIN, LOW);
-    delay(1000);
-    digitalWrite(AP_MODE_INDICATOR_PIN, HIGH);
-    delay(1000);
+    blinkLED(AP_MODE_LED_PIN);
   }
 
-  if (isConnected())
-  {
-    Serial.print("Endereço IP: ");
-    Serial.println(WiFi.localIP());
-    delay(5000); // Aguardar 5 segundos antes de mostrar o próximo endereço IP
-  }
-  else if (!isInAPMode)
+  if (!isWiFiConnected() && !isInAPMode)
   {
     setupWiFiClientMode();
   }
