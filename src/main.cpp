@@ -32,6 +32,11 @@ bool isWiFiConnected()
   return WiFi.status() == WL_CONNECTED;
 }
 
+bool isButtonPressed(int pin)
+{
+  return digitalRead(pin) == LOW;
+}
+
 bool areWiFiCredentialsValid(String ssid, String password)
 {
   WiFi.begin(ssid.c_str(), password.c_str());
@@ -176,17 +181,27 @@ void loop()
 {
   server.handleClient();
 
-  if (isInAPMode)
+  if (!isInAPMode)
+  {
+    if (isWiFiConnected())
+    {
+      int waterFlow = analogRead(A0);
+      Serial.print("Fluxo de água: ");
+      Serial.println(waterFlow);
+
+      // enviar para o servidor
+    }
+    else
+    {
+      setupWiFiClientMode();
+    }
+  }
+  else
   {
     blinkLED(AP_MODE_LED_PIN);
   }
 
-  if (!isWiFiConnected() && !isInAPMode)
-  {
-    setupWiFiClientMode();
-  }
-
-  if (digitalRead(RESET_PIN) == LOW)
+  if (isButtonPressed(RESET_PIN))
   {
     resetWiFiCredentials();
   }
