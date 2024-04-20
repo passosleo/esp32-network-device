@@ -27,6 +27,41 @@ void blinkLED(int pin, int delayTime = 1000)
   delay(delayTime);
 }
 
+bool isWiFiConnected()
+{
+  return WiFi.status() == WL_CONNECTED;
+}
+
+bool areWiFiCredentialsValid(String ssid, String password)
+{
+  WiFi.begin(ssid.c_str(), password.c_str());
+  int attempts = 0;
+
+  while (!isWiFiConnected() && attempts < 3)
+  {
+    delay(1000);
+    attempts++;
+  }
+
+  if (isWiFiConnected())
+  {
+    WiFi.disconnect();
+    return true;
+  }
+
+  return false;
+}
+
+void storeWiFiCredentials(String ssid, String password)
+{
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC_VALUE);
+  EEPROM.put(EEPROM_ADDR_MAGIC + 1, ssid);
+  EEPROM.put(EEPROM_ADDR_MAGIC + 1 + sizeof(ssid), password);
+  EEPROM.commit();
+  EEPROM.end();
+}
+
 void handleRoot()
 {
   server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><h1>Configuração de Rede Wi-Fi</h1><form action='/configure-wifi' method='post'><label for='ssid'>SSID:</label><input type='text' id='ssid' name='ssid'><br><br><label for='password'>Senha:</label><input type='password' id='password' name='password'><br><br><input type='submit' value='Enviar'></form></body></html>");
@@ -39,15 +74,17 @@ void handleConfigureWiFi()
     ssid = server.arg("ssid");
     password = server.arg("password");
 
-    EEPROM.begin(EEPROM_SIZE);
-    EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC_VALUE);
-    EEPROM.put(EEPROM_ADDR_MAGIC + 1, ssid);
-    EEPROM.put(EEPROM_ADDR_MAGIC + 1 + sizeof(ssid), password);
-    EEPROM.commit();
-    EEPROM.end();
-    server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><p>Configuração salva com sucesso!</p></body></html>");
-    delay(2000);
-    ESP.restart();
+    if (areWiFiCredentialsValid(ssid, password))
+    {
+      storeWiFiCredentials(ssid, password);
+      server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><p>Configuração salva com sucesso!</p></body></html>");
+      delay(2000);
+      ESP.restart();
+    }
+    else
+    {
+      server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><p>Credenciais inválidas. Por favor, verifique e tente novamente.</p><a href='/'>Voltar</a></body></html>");
+    }
   }
   else
   {
@@ -61,11 +98,6 @@ bool hasStoredWiFiCredentials()
   bool hasCredentials = EEPROM.read(EEPROM_ADDR_MAGIC) == EEPROM_MAGIC_VALUE;
   EEPROM.end();
   return hasCredentials;
-}
-
-bool isWiFiConnected()
-{
-  return WiFi.status() == WL_CONNECTED;
 }
 
 void setupWiFiClientMode()
