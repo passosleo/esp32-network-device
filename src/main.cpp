@@ -123,7 +123,7 @@ void handleConfigureWiFi()
   }
   else
   {
-    server.send(405, "text/plain", "Método não permitido.");
+    server.send(405, "text/plain", "Not Allowed");
   }
 }
 
@@ -215,7 +215,7 @@ void loop()
   {
     if (isWiFiConnected())
     {
-      // int waterFlow = analogRead(A0);
+      // int waterFlow = analogRead(15);
       // Serial.print("Fluxo de água: ");
       // Serial.println(waterFlow);
 
