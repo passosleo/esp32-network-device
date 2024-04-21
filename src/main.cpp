@@ -15,9 +15,39 @@ String password = "";
 #define CLIENT_MODE_LED_PIN 4
 #define RESET_PIN 5
 
+#define TIME_TO_RESET 10000
+
 #define EEPROM_SIZE 512
 #define EEPROM_ADDR_MAGIC 0
 #define EEPROM_MAGIC_VALUE 0xA5
+
+volatile bool timerRunning = false;
+unsigned long startTime = 0;
+unsigned long elapsedTime = 0;
+
+void startTimer()
+{
+  startTime = millis();
+  timerRunning = true;
+}
+
+void stopTimer()
+{
+  elapsedTime = millis() - startTime;
+  timerRunning = false;
+}
+
+unsigned long getElapsedTime()
+{
+  if (timerRunning)
+  {
+    return millis() - startTime;
+  }
+  else
+  {
+    return elapsedTime;
+  }
+}
 
 void blinkLED(int pin, int delayTime = 1000)
 {
@@ -145,7 +175,7 @@ void resetWiFiCredentials()
   EEPROM.write(EEPROM_ADDR_MAGIC, 0);
   EEPROM.commit();
   EEPROM.end();
-  delay(2000);
+  delay(5000);
   ESP.restart();
 }
 
@@ -185,9 +215,9 @@ void loop()
   {
     if (isWiFiConnected())
     {
-      int waterFlow = analogRead(A0);
-      Serial.print("Fluxo de água: ");
-      Serial.println(waterFlow);
+      // int waterFlow = analogRead(A0);
+      // Serial.print("Fluxo de água: ");
+      // Serial.println(waterFlow);
 
       // enviar para o servidor
     }
@@ -195,14 +225,37 @@ void loop()
     {
       setupWiFiClientMode();
     }
+
+    if (isButtonPressed(RESET_PIN))
+    {
+      if (!timerRunning)
+      {
+        startTimer();
+      }
+      else
+      {
+        if (getElapsedTime() >= 3000)
+        {
+          blinkLED(CLIENT_MODE_LED_PIN, 500);
+        }
+
+        if (getElapsedTime() >= TIME_TO_RESET)
+        {
+          stopTimer();
+          Serial.println("Botão pressionado por 10 segundos. Resetando as credenciais WiFi...");
+          digitalWrite(CLIENT_MODE_LED_PIN, LOW);
+          resetWiFiCredentials();
+        }
+      }
+    }
+    else
+    {
+      digitalWrite(CLIENT_MODE_LED_PIN, HIGH);
+      stopTimer();
+    }
   }
   else
   {
     blinkLED(AP_MODE_LED_PIN);
-  }
-
-  if (isButtonPressed(RESET_PIN))
-  {
-    resetWiFiCredentials();
   }
 }
