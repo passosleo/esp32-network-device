@@ -17,5 +17,11 @@
         value="Enviar"
       />
     </form>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error") === "1") {
+        alert("Credenciais inválidas!");
+      }
+    </script>
   </body>
 </html>

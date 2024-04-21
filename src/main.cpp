@@ -13,9 +13,12 @@ String password = "";
 
 #define AP_MODE_LED_PIN 2
 #define CLIENT_MODE_LED_PIN 4
-#define RESET_PIN 5
 
+#define RESET_PIN 5
 #define TIME_TO_RESET 10000
+
+#define WATER_FLOW_PIN 32
+#define ENABLE_WATER_FLOW_PIN 18
 
 #define EEPROM_SIZE 512
 #define EEPROM_ADDR_MAGIC 0
@@ -47,6 +50,21 @@ unsigned long getElapsedTime()
   {
     return elapsedTime;
   }
+}
+
+int interval = 1000;
+long currentMillis = 0;
+long previousMillis = 0;
+float calibrationFactor = 4.5;
+volatile byte pulseCount;
+byte pulse1Sec = 0;
+float flowRate;
+unsigned int flowMilliLitres;
+unsigned long totalMilliLitres;
+
+void IRAM_ATTR pulseCounter()
+{
+  pulseCount++;
 }
 
 void blinkLED(int pin, int delayTime = 1000)
@@ -99,7 +117,7 @@ void storeWiFiCredentials(String ssid, String password)
 
 void handleRoot()
 {
-  server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><h1>Configuração de Rede Wi-Fi</h1><form action='/configure-wifi' method='post'><label for='ssid'>SSID:</label><input type='text' id='ssid' name='ssid'><br><br><label for='password'>Senha:</label><input type='password' id='password' name='password'><br><br><input type='submit' value='Enviar'></form></body></html>");
+  server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><h1>Configuração de Rede Wi-Fi</h1><form action='/configure-wifi' method='post'><label for='ssid'>SSID:</label><input type='text' id='ssid' name='ssid'><br><br><label for='password'>Senha:</label><input type='password' id='password' name='password'><br><br><input type='submit' value='Enviar'></form><script>const params = new URLSearchParams(window.location.search);if (params.get('error') === '1') {alert('Credenciais inválidas!');}</script></body></html>");
 }
 
 void handleConfigureWiFi()
@@ -118,7 +136,9 @@ void handleConfigureWiFi()
     }
     else
     {
-      server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><p>Credenciais inválidas. Por favor, verifique e tente novamente.</p><a href='/'>Voltar</a></body></html>");
+      server.sendHeader("Location", "/?error=1", true);
+      server.send(302, "text/plain", "");
+      // server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><p>Credenciais inválidas. Por favor, verifique e tente novamente.</p><a href='/'>Voltar</a></body></html>");
     }
   }
   else
@@ -192,8 +212,18 @@ void setup()
   pinMode(AP_MODE_LED_PIN, OUTPUT);
   pinMode(CLIENT_MODE_LED_PIN, OUTPUT);
   pinMode(RESET_PIN, INPUT_PULLUP);
+  pinMode(WATER_FLOW_PIN, INPUT_PULLUP);
+  pinMode(ENABLE_WATER_FLOW_PIN, INPUT_PULLUP);
+
   Serial.begin(115200);
   delay(1000);
+
+  pulseCount = 0;
+  flowRate = 0.0;
+  flowMilliLitres = 0;
+  totalMilliLitres = 0;
+
+  attachInterrupt(digitalPinToInterrupt(WATER_FLOW_PIN), pulseCounter, FALLING);
 
   if (hasStoredWiFiCredentials())
   {
@@ -215,11 +245,50 @@ void loop()
   {
     if (isWiFiConnected())
     {
-      // int waterFlow = analogRead(15);
-      // Serial.print("Fluxo de água: ");
-      // Serial.println(waterFlow);
+      if (isButtonPressed(ENABLE_WATER_FLOW_PIN))
+      {
+        currentMillis = millis();
+        if (currentMillis - previousMillis > interval)
+        {
 
-      // enviar para o servidor
+          pulse1Sec = pulseCount;
+          pulseCount = 0;
+
+          // Because this loop may not complete in exactly 1 second intervals we calculate
+          // the number of milliseconds that have passed since the last execution and use
+          // that to scale the output. We also apply the calibrationFactor to scale the output
+          // based on the number of pulses per second per units of measure (litres/minute in
+          // this case) coming from the sensor.
+          flowRate = ((1000.0 / (millis() - previousMillis)) * pulse1Sec) / calibrationFactor;
+          previousMillis = millis();
+
+          // Divide the flow rate in litres/minute by 60 to determine how many litres have
+          // passed through the sensor in this 1 second interval, then multiply by 1000 to
+          // convert to millilitres.
+          flowMilliLitres = (flowRate / 60) * 1000;
+
+          // Add the millilitres passed in this second to the cumulative total
+          totalMilliLitres += flowMilliLitres;
+
+          // Print the flow rate for this second in litres / minute
+          Serial.print("Flow rate: ");
+          Serial.print(int(flowRate)); // Print the integer part of the variable
+          Serial.print("L/min");
+          Serial.print("\t"); // Print tab space
+
+          // Print the cumulative total of litres flowed since starting
+          Serial.print("Output Liquid Quantity: ");
+          Serial.print(totalMilliLitres);
+          Serial.print("mL / ");
+          Serial.print(totalMilliLitres / 1000);
+          Serial.println("L");
+        }
+      }
+      else
+      {
+        totalMilliLitres = 0;
+        flowRate = 0;
+      }
     }
     else
     {
