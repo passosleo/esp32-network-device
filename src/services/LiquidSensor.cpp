@@ -15,19 +15,20 @@ void LiquidSensor::begin(int _readInterval)
   flowRate = 0.0;
   flowMilliLitres = 0;
   totalMilliLitres = 0;
-  Timer.startTimer();
+  timer = Timer();
+  timer.startTimer();
 }
 
 void LiquidSensor::update()
 {
   if (Utils::isActiveOnLow(enableWaterFlowPin))
   {
-    if (Timer.getElapsedTime() > readInterval)
+    if (timer.getElapsedTime() > readInterval)
     {
       pulse1Sec = pulseCount;
       pulseCount = 0;
-      flowRate = ((1000.0 / Timer.getElapsedTime()) * pulse1Sec) / calibrationFactor;
-      Timer.startTimer();
+      flowRate = ((1000.0 / timer.getElapsedTime()) * pulse1Sec) / calibrationFactor;
+      timer.startTimer();
       flowMilliLitres = (flowRate / 60) * 1000;
       totalMilliLitres += flowMilliLitres;
     }

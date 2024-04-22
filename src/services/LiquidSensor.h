@@ -18,6 +18,7 @@ private:
   unsigned long totalMilliLitres;
   int waterFlowPin;
   int enableWaterFlowPin;
+  Timer timer;
 
 public:
   LiquidSensor(int flowPin, int enablePin, float _calibrationFactor = 4.5);

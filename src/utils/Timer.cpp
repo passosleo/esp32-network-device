@@ -1,27 +1,25 @@
 #include "Timer.h"
 
-TimerClass Timer;
-
-TimerClass::TimerClass()
+Timer::Timer()
 {
   timerRunning = false;
   startTime = 0;
   elapsedTime = 0;
 }
 
-void TimerClass::startTimer()
+void Timer::startTimer()
 {
   startTime = millis();
   timerRunning = true;
 }
 
-void TimerClass::stopTimer()
+void Timer::stopTimer()
 {
   elapsedTime = millis() - startTime;
   timerRunning = false;
 }
 
-unsigned long TimerClass::getElapsedTime()
+unsigned long Timer::getElapsedTime()
 {
   if (timerRunning)
   {
@@ -33,7 +31,7 @@ unsigned long TimerClass::getElapsedTime()
   }
 }
 
-bool TimerClass::isTimerRunning()
+bool Timer::isTimerRunning()
 {
   return timerRunning;
 }

@@ -1,6 +1,9 @@
+#include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <EEPROM.h>
+#include "Utils.h"
+#include "Timer.h"
 #include "LiquidSensor.h"
 
 #define AP_MODE_LED_PIN 2
@@ -23,6 +26,7 @@ unsigned long totalMilliLitres = 0;
 unsigned long lastTotalMilliLitres = 0;
 WebServer server(80);
 WiFiClient client;
+Timer timer;
 LiquidSensor liquidSensor(WATER_FLOW_PIN, ENABLE_WATER_FLOW_PIN);
 
 String ssid = "";
@@ -87,7 +91,6 @@ void handleConfigureWiFi()
     {
       server.sendHeader("Location", "/?error=1", true);
       server.send(302, "text/plain", "");
-      // server.send(200, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Configurar Wi-Fi</title></head><body><p>Credenciais inválidas. Por favor, verifique e tente novamente.</p><a href='/'>Voltar</a></body></html>");
     }
   }
   else
@@ -197,7 +200,7 @@ void loop()
       if (totalMilliLitres > 0 && totalMilliLitres != lastTotalMilliLitres)
       {
         lastTotalMilliLitres = totalMilliLitres;
-        if (client.connect("192.168.0.102", 3000))
+        if (client.connect("192.168.0.104", 3000))
         {
           client.println(macAddress + ";" + totalMilliLitres);
           client.stop();
@@ -215,20 +218,20 @@ void loop()
 
     if (Utils::isButtonPressed(RESET_PIN))
     {
-      if (!Timer.isTimerRunning())
+      if (!timer.isTimerRunning())
       {
-        Timer.startTimer();
+        timer.startTimer();
       }
       else
       {
-        if (Timer.getElapsedTime() >= 3000)
+        if (timer.getElapsedTime() >= 3000)
         {
           Utils::blinkLED(CLIENT_MODE_LED_PIN, 500);
         }
 
-        if (Timer.getElapsedTime() >= TIME_TO_RESET)
+        if (timer.getElapsedTime() >= TIME_TO_RESET)
         {
-          Timer.stopTimer();
+          timer.stopTimer();
           Serial.println("Botão pressionado por 10 segundos. Resetando as credenciais WiFi...");
           digitalWrite(CLIENT_MODE_LED_PIN, LOW);
           resetWiFiCredentials();
@@ -238,7 +241,7 @@ void loop()
     else
     {
       digitalWrite(CLIENT_MODE_LED_PIN, HIGH);
-      Timer.stopTimer();
+      timer.stopTimer();
     }
   }
   else

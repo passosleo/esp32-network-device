@@ -3,10 +3,10 @@
 
 #include <Arduino.h>
 
-class TimerClass
+class Timer
 {
 public:
-  TimerClass();
+  Timer();
   void startTimer();
   void stopTimer();
   unsigned long getElapsedTime();
@@ -17,7 +17,5 @@ private:
   unsigned long elapsedTime;
   bool timerRunning;
 };
-
-extern TimerClass Timer;
 
 #endif
