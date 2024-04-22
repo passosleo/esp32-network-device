@@ -197,7 +197,7 @@ void loop()
       if (totalMilliLitres > 0 && totalMilliLitres != lastTotalMilliLitres)
       {
         lastTotalMilliLitres = totalMilliLitres;
-        if (client.connect("192.168.0.104", 3000))
+        if (client.connect("192.168.0.102", 3000))
         {
           client.println(macAddress + ";" + totalMilliLitres);
           client.stop();
