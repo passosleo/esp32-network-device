@@ -1,23 +1,37 @@
 const net = require("net");
 
+const TIMEOUT_INTERVAL = 2000;
+const clientTimeouts = {};
+const clientData = {};
+
 const server = net.createServer((socket) => {
-  console.log("Client connected");
-
   socket.on("data", (data) => {
-    const [macAddress, mL] = data.toString().split(";");
+    const receivedData = data.toString().trim();
 
-    const info = {
+    if (receivedData.length < 1 || !receivedData.includes(";")) return;
+
+    const [macAddress, mL] = receivedData.split(";");
+
+    clearTimeout(clientTimeouts[macAddress]);
+    clientData[macAddress] = {
       macAddress,
       totalMilliliters: Number(mL),
       totalLiters: Number(mL) / 1000,
     };
 
-    console.log(info);
+    clientTimeouts[macAddress] = setTimeout(() => {
+      console.log(
+        `Idle for 2 seconds. Triggering callback for client ${macAddress} with last data received:`
+      );
+      console.log(clientData[macAddress]);
+
+      clearTimeout(clientTimeouts[macAddress]);
+      delete clientTimeouts[macAddress];
+      delete clientData[macAddress];
+    }, TIMEOUT_INTERVAL);
   });
 
-  socket.on("end", () => {
-    console.log("Client disconnected");
-  });
+  socket.on("end", () => {});
 });
 
 const PORT = 3000;
